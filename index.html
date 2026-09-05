@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Ledger</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#050505;
+    --panel:#0e0e10;
+    --panel-alt:#151517;
+    --hair:#2a2325;
+    --white:#f2f0ec;
+    --dim:#8a8580;
+    --red:#e4283c;
+    --red-bright:#ff2e46;
+    --red-dim:#7a1420;
+    --red-glow:rgba(228,40,60,0.55);
+    --red-glow-soft:rgba(228,40,60,0.22);
+    --gray:#5c5854;
+    --shadow-deep:0 30px 70px rgba(0,0,0,0.65), 0 2px 0 rgba(255,255,255,0.02) inset;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html{ background:var(--bg); }
+
+  body{
+    margin:0;
+    position:relative;
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(ellipse 1200px 700px at 50% -10%, rgba(228,40,60,0.14), transparent 60%),
+      radial-gradient(ellipse 1000px 800px at 100% 110%, rgba(228,40,60,0.08), transparent 55%),
+      repeating-linear-gradient(0deg, rgba(228,40,60,0.035) 0px, rgba(228,40,60,0.035) 1px, transparent 1px, transparent 28px);
+    color:var(--white);
+    font-family:'Rajdhani', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:1;
+    background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.055) 1px, transparent 0);
+    background-size:3px 3px;
+    opacity:0.5;
+    mix-blend-mode:overlay;
+  }
+  body::after{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:1;
+    box-shadow:inset 0 0 220px rgba(0,0,0,0.85);
+  }
+
+  .mono{ font-family:'JetBrains Mono', monospace; }
+
+  #app{ position:relative; z-index:2; max-width:1900px; width:100%; margin:0 auto; padding:32px clamp(16px,4vw,56px) 80px; }
+
+  .cut{ clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); }
+  .cut-sm{ clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+
+  .header{
+    display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between;
+    gap:16px; margin-bottom:28px; padding-bottom:22px; border-bottom:1px solid var(--hair); position:relative;
+  }
+  .title{
+    font-size:clamp(32px,4vw,48px); font-weight:700; text-transform:uppercase; letter-spacing:0.1em;
+    text-shadow:0 0 30px var(--red-glow), 0 0 70px var(--red-glow-soft); margin:0; line-height:1;
+  }
+  .title span{ color:var(--red-bright); animation:flicker 4.5s infinite; }
+  .title-rule{
+    width:64px; height:3px; margin-top:12px; background:linear-gradient(90deg, var(--red-bright), transparent);
+    box-shadow:0 0 12px var(--red-glow);
+  }
+  .subtitle{ font-size:13px; color:var(--dim); letter-spacing:0.08em; margin-top:12px; }
+
+  .progress-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .progress-track{ width:160px; height:7px; background:var(--panel-alt); border:1px solid var(--hair); box-shadow:inset 0 1px 3px rgba(0,0,0,0.6); }
+  .progress-fill{ height:100%; background:linear-gradient(90deg, var(--red-dim), var(--red-bright)); box-shadow:0 0 12px var(--red-glow); transition:width .4s ease; }
+  .progress-text{ font-size:12px; color:var(--red-bright); letter-spacing:0.05em; }
+
+  @keyframes flicker{
+    0%,92%,100%{ opacity:1; }
+    93%{ opacity:0.65; }
+    95%{ opacity:1; }
+    96%{ opacity:0.75; }
+    97%{ opacity:1; }
+  }
+
+  select{
+    appearance:none; -webkit-appearance:none; background-color:var(--panel); color:var(--white);
+    border:1px solid var(--red); padding:10px 14px; font-size:12px; letter-spacing:0.05em;
+    font-family:'JetBrains Mono', monospace; cursor:pointer; box-shadow:var(--shadow-deep);
+    transition:box-shadow .2s ease;
+  }
+  select:hover{ box-shadow:0 0 16px var(--red-glow), var(--shadow-deep); }
+  select option{ background:#111112; color:var(--white); }
+  .select-row{ display:flex; gap:8px; }
+
+  .actions{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:24px; }
+  button{ cursor:pointer; font-family:inherit; }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:600;
+    padding:10px 18px; text-transform:uppercase; letter-spacing:0.06em;
+    background:var(--panel); color:var(--white); border:1px solid var(--hair);
+    box-shadow:var(--shadow-deep);
+    transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+  }
+  .btn:hover{ box-shadow:0 0 20px var(--red-glow), var(--shadow-deep); transform:translateY(-1px); border-color:var(--red); }
+  .btn:active{ transform:translateY(0); }
+  .btn.active, .btn.primary{ background:linear-gradient(180deg, var(--red-bright), var(--red)); color:#0a0a0a; border-color:var(--red); }
+
+  .warn{ font-size:12px; color:var(--red); font-family:'JetBrains Mono', monospace; }
+
+  .add-form{
+    display:flex; align-items:center; gap:8px; margin-bottom:24px; padding:14px;
+    background:var(--panel); border:1px solid var(--hair); box-shadow:var(--shadow-deep);
+  }
+  .add-form input{
+    flex:1; font-family:'JetBrains Mono', monospace; font-size:12px; padding:10px 14px;
+    background:#0a0a0b; border:1px solid var(--hair); color:var(--white); outline:none; letter-spacing:0.03em;
+    transition:border-color .18s ease, box-shadow .18s ease;
+  }
+  .add-form input:focus{ border-color:var(--red); box-shadow:0 0 12px var(--red-glow-soft); }
+  .add-form input::placeholder{ color:var(--gray); }
+
+  .empty{
+    text-align:center; padding:70px 20px; border:1px dashed var(--hair); color:var(--dim); margin-bottom:28px;
+    background:radial-gradient(ellipse at center, rgba(228,40,60,0.05), transparent 70%);
+  }
+  .empty .big{ font-size:20px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--white); margin-bottom:8px; text-shadow:0 0 20px var(--red-glow-soft); }
+  .empty .small{ font-size:12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; }
+
+  .panel{ background:var(--panel); border:1px solid var(--hair); padding:18px; margin-bottom:28px; box-shadow:var(--shadow-deep); }
+
+  .chart-svg{ width:100%; display:block; }
+  .chart-svg.bar{ height:clamp(200px,26vw,260px); }
+  .chart-svg.line{ height:clamp(260px,34vw,380px); }
+  .grid-line{ stroke:var(--hair); stroke-width:1; }
+  .axis-label{ fill:var(--dim); font-size:11px; font-family:'JetBrains Mono', monospace; }
+  .bar-value{ fill:var(--white); font-size:11px; font-family:'JetBrains Mono', monospace; }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--dim); }
+  .legend-dot{ width:8px; height:8px; flex-shrink:0; }
+
+  .table-wrap{
+    overflow-x:auto; background:var(--panel); border:1px solid var(--hair); box-shadow:var(--shadow-deep);
+    width:100%; position:relative; border-top:2px solid var(--red);
+  }
+  table{ border-collapse:collapse; width:100%; min-width:820px; table-layout:fixed; font-size:14px; }
+  th, td{ white-space:nowrap; }
+  th.list-head, td.name-cell{ white-space:normal; }
+  thead th{
+    text-align:center; font-weight:400; padding:8px 6px; font-size:11px;
+    border-left:1px solid var(--hair); font-family:'JetBrains Mono', monospace; color:var(--dim);
+    background:var(--panel);
+  }
+  thead th.weekend{ background:var(--panel-alt); }
+  thead th.today-col{ background:var(--red-dim); color:var(--white); font-weight:700; box-shadow:inset 0 0 14px rgba(228,40,60,0.4); }
+  thead .list-head{
+    position:sticky; left:0; z-index:3; text-align:left; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.06em; padding:10px 12px 10px 20px; border-right:2px solid var(--red); background:var(--panel-alt);
+    color:var(--dim); font-family:'Rajdhani',sans-serif; width:190px;
+    box-shadow:4px 0 12px rgba(0,0,0,0.5);
+  }
+  tbody td.name-cell{
+    position:sticky; left:0; z-index:3; background:var(--panel); border-right:2px solid var(--red);
+    border-top:1px solid var(--hair); padding:10px 12px 10px 20px;
+    box-shadow:4px 0 12px rgba(0,0,0,0.5);
+  }
+  tbody td.day-cell{ text-align:center; padding:9px 4px; border-left:1px solid var(--hair); border-top:1px solid var(--hair); }
+  tbody td.day-cell.weekend{ background:#0c0c0d; }
+  tbody tr:hover td.day-cell{ background:rgba(228,40,60,0.045); }
+  tbody tr:hover td.day-cell.weekend{ background:rgba(228,40,60,0.06); }
+
+  .name-row{ display:flex; align-items:flex-start; gap:9px; }
+  .name-dot{ width:9px; height:9px; flex-shrink:0; border-radius:1px; margin-top:5px; }
+  .name-text{ font-weight:600; font-size:14px; text-transform:uppercase; letter-spacing:0.04em; word-break:break-word; overflow-wrap:break-word; min-width:0; flex:1; }
+  .del-btn{ margin-left:2px; margin-top:2px; flex-shrink:0; opacity:0.35; background:none; border:none; color:var(--red); display:flex; align-items:center; transition:opacity .15s ease; }
+  .del-btn:hover{ opacity:1; }
+
+  .cell-today{
+    width:26px; height:26px; border:1px solid var(--red); background:transparent; display:flex;
+    align-items:center; justify-content:center; margin:0 auto; transition:box-shadow .15s ease, transform .15s ease;
+    animation:pulse-idle 2.6s ease-in-out infinite;
+  }
+  .cell-today:hover{ box-shadow:0 0 14px var(--red-glow); transform:scale(1.08); }
+  .cell-today.checked{ background:linear-gradient(180deg, var(--red-bright), var(--red)); box-shadow:0 0 16px var(--red-glow); animation:none; }
+
+  @keyframes pulse-idle{
+    0%,100%{ box-shadow:0 0 0 rgba(228,40,60,0); }
+    50%{ box-shadow:0 0 9px var(--red-glow-soft); }
+  }
+
+  .cell-future{
+    width:26px; height:26px; border:1px dashed var(--hair); display:flex; align-items:center;
+    justify-content:center; margin:0 auto; color:var(--gray);
+  }
+  .cell-past{
+    width:26px; height:26px; border:1px solid var(--hair); display:flex; align-items:center;
+    justify-content:center; margin:0 auto; opacity:0.5;
+  }
+  .cell-past.checked{ opacity:0.92; box-shadow:0 0 8px rgba(0,0,0,0.4); }
+
+  .foot-note{ font-size:11px; color:var(--dim); font-family:'JetBrains Mono', monospace; letter-spacing:0.02em; margin-top:12px; }
+
+  @media (max-width:640px){
+    .header{ flex-direction:column; }
+    thead .list-head, tbody td.name-cell{ width:140px; padding-left:14px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var API_URL = "/api/data";
+  var PALETTE = ["#e4283c", "#f2f0ec", "#ff6b7a", "#9c9691", "#b01e30", "#d8d3cc", "#ff4655", "#6e6864"];
+  var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  var topics = [];
+  var checks = {};
+  var view = "month";
+  var showAdd = false;
+  var syncWarning = false;
+  var loadError = "";
+
+  var now0 = new Date();
+  var selMonth = now0.getMonth();
+  var selYear = now0.getFullYear();
+
+  function colorFor(i){ return PALETTE[i % PALETTE.length]; }
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function keyFor(y,m,d){ return y+"-"+pad2(m+1)+"-"+pad2(d); }
+  function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
+  function weekdayLetter(y,m,d){ return new Date(y,m,d).toLocaleDateString("en-US",{weekday:"narrow"}); }
+  function isWeekend(y,m,d){ var day = new Date(y,m,d).getDay(); return day===0 || day===6; }
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  async function loadData(){
+    try{
+      var res = await fetch(API_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if(!res.ok) throw new Error("Server returned " + res.status);
+      var state = await res.json();
+      topics = Array.isArray(state.topics) ? state.topics : [];
+      checks = (state.checks && typeof state.checks === "object") ? state.checks : {};
+      loadError = "";
+    }catch(e){
+      console.error("loadData failed", e);
+      topics = []; checks = {};
+      loadError = "Couldn't reach the backend \u2014 check your connection and reload. Changes made now won't be saved.";
+    }
+  }
+
+  async function persist(){
+    try{
+      var res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topics: topics, checks: checks })
+      });
+      if(!res.ok) throw new Error("Server returned " + res.status);
+      syncWarning = false;
+    }catch(e){
+      console.error("persist failed", e);
+      syncWarning = true;
+    }
+    render();
+  }
+
+  function cellStatus(y,m,d,todayOnly){
+    var t = new Date(y,m,d).getTime();
+    if(t === todayOnly) return "today";
+    return t > todayOnly ? "future" : "past";
+  }
+
+  function addTopic(name){
+    name = (name||"").trim();
+    if(!name) return;
+    topics.push({ id: "t" + Date.now() + Math.floor(Math.random()*1000), name: name });
+    render();
+    persist();
+  }
+
+  function deleteTopic(id, name){
+    var ok = window.confirm('Remove "' + name + '" and all its history? This can\'t be undone.');
+    if(!ok) return;
+    topics = topics.filter(function(t){ return t.id !== id; });
+    delete checks[id];
+    render();
+    persist();
+  }
+
+  function toggleCheck(topicId, key, todayKey){
+    if(key !== todayKey) return;
+    if(!checks[topicId]) checks[topicId] = {};
+    if(checks[topicId][key]) delete checks[topicId][key];
+    else checks[topicId][key] = true;
+    render();
+    persist();
+  }
+
+  function buildBarChartSVG(data){
+    var w = 900, h = 220, padL = 10, padR = 10, padT = 26, padB = 34;
+    var chartW = w - padL - padR, chartH = h - padT - padB;
+    var maxVal = Math.max(1, Math.max.apply(null, data.map(function(d){return d.count;})));
+    var n = data.length || 1;
+    var gap = 18;
+    var barW = Math.max(20, (chartW / n) - gap);
+    var defs = '<defs><filter id="glow" x="-60%" y="-60%" width="220%" height="220%">' +
+      '<feGaussianBlur stdDeviation="3.2" result="blur"/>' +
+      '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+      '</filter></defs>';
+    data.forEach(function(d,i){
+      defs += '<linearGradient id="barGrad'+i+'" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="'+d.fill+'" stop-opacity="1"/>' +
+        '<stop offset="100%" stop-color="'+d.fill+'" stop-opacity="0.35"/>' +
+        '</linearGradient>';
+    });
+    var grid = "";
+    for(var g=0; g<=4; g++){
+      var gy = padT + chartH - (g/4)*chartH;
+      grid += '<line x1="'+padL+'" y1="'+gy+'" x2="'+(w-padR)+'" y2="'+gy+'" class="grid-line"/>';
+    }
+    var bars = "";
+    data.forEach(function(d,i){
+      var x = padL + i*(barW+gap) + gap/2;
+      var barH = Math.max(1.5, (d.count/maxVal) * chartH);
+      var y = padT + chartH - barH;
+      var maxChars = Math.max(3, Math.floor(barW / 6.2));
+      var label = d.name.length > maxChars ? (d.name.slice(0, Math.max(1,maxChars-1)) + "\u2026") : d.name;
+      bars += '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+barH+'" rx="3" fill="url(#barGrad'+i+')" filter="url(#glow)"/>';
+      bars += '<text x="'+(x+barW/2)+'" y="'+(h-10)+'" text-anchor="middle" class="axis-label">'+escapeHtml(label)+(label!==d.name ? '<title>'+escapeHtml(d.name)+'</title>' : '')+'</text>';
+      bars += '<text x="'+(x+barW/2)+'" y="'+(y-8)+'" text-anchor="middle" class="bar-value">'+d.count+'</text>';
+    });
+    return '<svg viewBox="0 0 '+w+' '+h+'" class="chart-svg bar" preserveAspectRatio="none">'+defs+grid+bars+'</svg>';
+  }
+
+  function buildLineChartSVG(months, series){
+    var w = 960, h = 320, padL = 24, padR = 24, padT = 18, padB = 34;
+    var chartW = w - padL - padR, chartH = h - padT - padB;
+    var allVals = series.reduce(function(acc,s){ return acc.concat(s.values); }, []);
+    var maxVal = Math.max(1, Math.max.apply(null, allVals.length ? allVals : [0]));
+    var stepX = chartW / Math.max(1, months.length - 1);
+    var defs = '<defs><filter id="lineGlow" x="-60%" y="-60%" width="220%" height="220%">' +
+      '<feGaussianBlur stdDeviation="2.6" result="blur"/>' +
+      '<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+      '</filter></defs>';
+    var grid = "";
+    for(var g=0; g<=4; g++){
+      var gy = padT + chartH - (g/4)*chartH;
+      grid += '<line x1="'+padL+'" y1="'+gy+'" x2="'+(w-padR)+'" y2="'+gy+'" class="grid-line"/>';
+    }
+    var xlabels = "";
+    months.forEach(function(m,i){
+      var x = padL + i*stepX;
+      xlabels += '<text x="'+x+'" y="'+(h-10)+'" text-anchor="middle" class="axis-label">'+m+'</text>';
+    });
+    var lines = "";
+    series.forEach(function(s){
+      var pts = s.values.map(function(v,i){
+        var x = padL + i*stepX;
+        var y = padT + chartH - (v/maxVal)*chartH;
+        return x+","+y;
+      }).join(" ");
+      lines += '<polyline points="'+pts+'" fill="none" stroke="'+s.color+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" filter="url(#lineGlow)"/>';
+      s.values.forEach(function(v,i){
+        var x = padL + i*stepX;
+        var y = padT + chartH - (v/maxVal)*chartH;
+        lines += '<circle cx="'+x+'" cy="'+y+'" r="3.2" fill="'+s.color+'" filter="url(#lineGlow)"/>';
+      });
+    });
+    return '<svg viewBox="0 0 '+w+' '+h+'" class="chart-svg line" preserveAspectRatio="none">'+defs+grid+lines+xlabels+'</svg>';
+  }
+
+  function render(){
+    var now = new Date();
+    var todayY = now.getFullYear(), todayM = now.getMonth(), todayD = now.getDate();
+    var todayOnly = new Date(todayY, todayM, todayD).getTime();
+    var todayKey = keyFor(todayY, todayM, todayD);
+
+    var yearOptions = [];
+    for(var y = todayY - 5; y <= todayY + 1; y++) yearOptions.push(y);
+
+    var todayDoneCount = topics.filter(function(t){ return checks[t.id] && checks[t.id][todayKey]; }).length;
+    var todayPct = topics.length ? Math.round((todayDoneCount/topics.length)*100) : 0;
+
+    var html = "";
+
+    // header
+    html += '<div class="header">';
+    html += '  <div>';
+    html += '    <h1 class="title">Daily <span>Ledger</span></h1>';
+    html += '    <div class="title-rule"></div>';
+    html += '    <div class="subtitle mono">' + (view==="month"
+              ? (MONTH_NAMES[todayM].toUpperCase()+" "+todayD+", "+todayY)
+              : ("YEAR "+selYear+" OVERVIEW")) + '</div>';
+    if(view==="month" && topics.length>0){
+      html += '    <div class="progress-row">';
+      html += '      <div class="progress-track"><div class="progress-fill" style="width:'+todayPct+'%"></div></div>';
+      html += '      <span class="progress-text mono">'+todayDoneCount+'/'+topics.length+'</span>';
+      html += '    </div>';
+    }
+    html += '  </div>';
+
+    if(view === "month"){
+      html += '  <div class="select-row">';
+      html += '    <select id="monthSelect">';
+      MONTH_NAMES.forEach(function(m,i){
+        html += '<option value="'+i+'"'+(i===selMonth?' selected':'')+'>'+m.toUpperCase()+'</option>';
+      });
+      html += '    </select>';
+      html += '    <select id="yearSelect">';
+      yearOptions.forEach(function(yy){
+        html += '<option value="'+yy+'"'+(yy===selYear?' selected':'')+'>'+yy+'</option>';
+      });
+      html += '    </select>';
+      html += '  </div>';
+    } else {
+      html += '  <select id="yearSelectAnnual">';
+      yearOptions.forEach(function(yy){
+        html += '<option value="'+yy+'"'+(yy===selYear?' selected':'')+'>'+yy+'</option>';
+      });
+      html += '  </select>';
+    }
+    html += '</div>';
+
+    // actions
+    html += '<div class="actions">';
+    if(view === "month"){
+      html += '<button class="btn cut-sm'+(showAdd?' active':'')+'" data-action="toggle-add">+ Add New Topic</button>';
+    }
+    html += '<button class="btn cut-sm'+(view==="year"?' active':'')+'" data-action="toggle-view">'+(view==="year"?'\u2261 Back To List':'\u25A4 Annual Graph')+'</button>';
+    if(syncWarning){
+      html += '<span class="warn">SYNC FAILED \u2014 changes may not be saved to the server. Check your connection.</span>';
+    }
+    html += '</div>';
+
+    if(loadError){
+      html += '<div class="warn" style="display:block;margin-bottom:16px;">'+escapeHtml(loadError)+'</div>';
+    }
+
+    // add form
+    if(showAdd && view === "month"){
+      html += '<div class="add-form cut">';
+      html += '  <input id="newTopicInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="TOPIC NAME \u2014 INSTA, EBAY, EMAIL..." />';
+      html += '  <button class="btn cut-sm primary" data-action="submit-add">\u2713 Add</button>';
+      html += '  <button class="btn cut-sm" data-action="cancel-add">\u2715 Cancel</button>';
+      html += '</div>';
+    }
+
+    if(topics.length === 0){
+      html += '<div class="empty">';
+      html += '  <div class="big">Ledger Empty</div>';
+      html += '  <div class="small mono">ADD A TOPIC TO START TRACKING</div>';
+      html += '</div>';
+    }
+
+    if(topics.length > 0 && view === "month"){
+      var numDays = daysInMonth(selYear, selMonth);
+      var dayList = [];
+      for(var d=1; d<=numDays; d++) dayList.push(d);
+
+      // bar chart data
+      var barData = topics.map(function(t,i){
+        var count = 0;
+        dayList.forEach(function(d){
+          var k = keyFor(selYear, selMonth, d);
+          if(checks[t.id] && checks[t.id][k]) count++;
+        });
+        return { name: t.name, count: count, fill: colorFor(i) };
+      });
+
+      html += '<div class="panel cut">' + buildBarChartSVG(barData) + '</div>';
+
+      // table
+      html += '<div class="table-wrap"><table><thead><tr>';
+      html += '<th class="list-head">List</th>';
+      dayList.forEach(function(d){
+        var weekend = isWeekend(selYear, selMonth, d);
+        var status = cellStatus(selYear, selMonth, d, todayOnly);
+        var cls = status==="today" ? "today-col" : (weekend ? "weekend" : "");
+        html += '<th class="'+cls+'"><div>'+d+'</div><div style="font-size:9px;opacity:.7">'+weekdayLetter(selYear, selMonth, d)+'</div></th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      topics.forEach(function(topic, ti){
+        html += '<tr>';
+        html += '<td class="name-cell"><div class="name-row">';
+        html += '<span class="name-dot" style="background:'+colorFor(ti)+';box-shadow:0 0 6px '+colorFor(ti)+'"></span>';
+        html += '<span class="name-text">'+escapeHtml(topic.name)+'</span>';
+        html += '<button class="del-btn" data-action="delete-topic" data-id="'+topic.id+'" data-name="'+escapeHtml(topic.name)+'" aria-label="Delete">';
+        html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+        html += '</button>';
+        html += '</div></td>';
+
+        dayList.forEach(function(d){
+          var status = cellStatus(selYear, selMonth, d, todayOnly);
+          var key = keyFor(selYear, selMonth, d);
+          var checked = !!(checks[topic.id] && checks[topic.id][key]);
+          var weekend = isWeekend(selYear, selMonth, d);
+          html += '<td class="day-cell'+(weekend?' weekend':'')+'">';
+          if(status === "today"){
+            html += '<button class="cell-today'+(checked?' checked':'')+'" data-action="toggle-check" data-id="'+topic.id+'" data-key="'+key+'" aria-label="Toggle">';
+            if(checked) html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+            html += '</button>';
+          } else if(status === "future"){
+            html += '<div class="cell-future"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>';
+          } else {
+            html += '<div class="cell-past'+(checked?' checked':'')+'" style="'+(checked ? ('border-color:'+colorFor(ti)+';background:'+colorFor(ti)) : '')+'">';
+            if(checked) html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+            html += '</div>';
+          }
+          html += '</td>';
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      html += '<div class="foot-note">ONLY TODAY\'S CELL IS LIVE. PAST DAYS ARE LOCKED HISTORY \u2014 FUTURE DAYS STAY LOCKED UNTIL THEY ARRIVE.</div>';
+    }
+
+    if(topics.length > 0 && view === "year"){
+      var annualSeries = topics.map(function(t,i){
+        var values = MONTH_SHORT.map(function(mn, mi){
+          var dim = daysInMonth(selYear, mi);
+          var count = 0;
+          for(var dd=1; dd<=dim; dd++){
+            var k = keyFor(selYear, mi, dd);
+            if(checks[t.id] && checks[t.id][k]) count++;
+          }
+          return count;
+        });
+        return { name: t.name, color: colorFor(i), values: values };
+      });
+
+      html += '<div class="panel cut">';
+      html += buildLineChartSVG(MONTH_SHORT, annualSeries);
+      html += '<div class="legend">';
+      annualSeries.forEach(function(s){
+        html += '<div class="legend-item"><span class="legend-dot" style="background:'+s.color+'"></span>'+escapeHtml(s.name)+'</div>';
+      });
+      html += '</div>';
+      html += '<div class="foot-note">EACH LINE TRACKS DAYS CHECKED PER MONTH ACROSS '+selYear+'.</div>';
+      html += '</div>';
+    }
+
+    document.getElementById("app").innerHTML = html;
+
+    if(showAdd){
+      var inp = document.getElementById("newTopicInput");
+      if(inp) inp.focus();
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var app = document.getElementById("app");
+    app.innerHTML = '<div class="foot-note mono" style="padding:40px;text-align:center;">CONNECTING TO SERVER\u2026</div>';
+
+    app.addEventListener("click", function(e){
+      var el = e.target.closest("[data-action]");
+      if(!el) return;
+      var action = el.dataset.action;
+      if(action === "toggle-add"){ showAdd = !showAdd; render(); }
+      else if(action === "toggle-view"){ view = (view === "month") ? "year" : "month"; render(); }
+      else if(action === "cancel-add"){ showAdd = false; render(); }
+      else if(action === "submit-add"){
+        var input = document.getElementById("newTopicInput");
+        addTopic(input ? input.value : "");
+      }
+      else if(action === "delete-topic"){ deleteTopic(el.dataset.id, el.dataset.name); }
+      else if(action === "toggle-check"){
+        var now = new Date();
+        var todayKey = keyFor(now.getFullYear(), now.getMonth(), now.getDate());
+        toggleCheck(el.dataset.id, el.dataset.key, todayKey);
+      }
+    });
+
+    app.addEventListener("change", function(e){
+      if(e.target.id === "monthSelect"){ selMonth = Number(e.target.value); render(); }
+      else if(e.target.id === "yearSelect"){ selYear = Number(e.target.value); render(); }
+      else if(e.target.id === "yearSelectAnnual"){ selYear = Number(e.target.value); render(); }
+    });
+
+    app.addEventListener("keydown", function(e){
+      if(e.target.id === "newTopicInput"){
+        if(e.key === "Enter") addTopic(e.target.value);
+        if(e.key === "Escape"){ showAdd = false; render(); }
+      }
+    });
+
+    loadData().then(function(){
+      try{
+        render();
+      }catch(err){
+        app.innerHTML = '<div style="max-width:640px;margin:60px auto;padding:24px;border:1px solid var(--red);background:var(--panel);color:var(--white);font-family:\'JetBrains Mono\',monospace;font-size:12px;white-space:pre-wrap;">RENDER ERROR:\n' + (err && err.stack ? err.stack : err) + '</div>';
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
